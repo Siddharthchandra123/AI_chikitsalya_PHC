@@ -237,3 +237,33 @@ class FacilityIncident(Base):
     reported_by = Column(String, nullable=False)
     reported_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
+
+class KafkaOutboxEvent(Base):
+    __tablename__ = "kafka_outbox"
+
+    id = Column(String, primary_key=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    topic = Column(String, nullable=False, index=True)
+    payload_json = Column(Text, nullable=False)
+    status = Column(String, default="PENDING", index=True) # PENDING, PUBLISHED, FAILED, DLT
+    retry_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    published_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    correlation_id = Column(String, nullable=True)
+
+class InAppNotification(Base):
+    __tablename__ = "in_app_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String, nullable=False, index=True)
+    target_role = Column(String, nullable=True)
+    target_user_id = Column(String, nullable=True)
+    patient_id = Column(String, nullable=True)
+    facility_id = Column(Integer, nullable=True)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    event_type = Column(String, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
