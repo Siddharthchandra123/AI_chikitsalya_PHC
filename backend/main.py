@@ -458,24 +458,54 @@ def get_followups(status: Optional[str] = None, db: Session = Depends(get_db)):
     } for f, p in fups]
 
 # ==========================================
-# AUDIT LOGS
+# FACILITY OPERATIONAL INCIDENTS & BOTTLENECKS
 # ==========================================
 
-@app.get("/api/audit-logs")
-def get_audit_logs(limit: int = 50, db: Session = Depends(get_db)):
-    logs = db.query(models.AuditEvent).order_by(models.AuditEvent.timestamp.desc()).limit(limit).all()
-    return [{
-        "id": l.id,
-        "user_name": l.user_name,
-        "role": l.role,
-        "action": l.action,
-        "entity_type": l.entity_type,
-        "entity_id": l.entity_id,
-        "timestamp": l.timestamp.isoformat(),
-        "details": l.details
-    } for l in logs]
+@app.get("/api/incidents", response_model=List[schemas.FacilityIncidentOut])
+def get_facility_incidents(facility_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(models.FacilityIncident)
+    if facility_id:
+        query = query.filter(models.FacilityIncident.facility_id == facility_id)
+    if status:
+        query = query.filter(models.FacilityIncident.status == status)
+    return query.order_by(models.FacilityIncident.reported_at.desc()).all()
+
+@app.post("/api/incidents", response_model=schemas.FacilityIncidentOut)
+def create_facility_incident(payload: schemas.FacilityIncidentCreate, db: Session = Depends(get_db)):
+    incident = models.FacilityIncident(
+        facility_id=payload.facility_id,
+        category=payload.category,
+        title=payload.title,
+        description=payload.description,
+        severity=payload.severity or "MEDIUM",
+        reported_by=payload.reported_by,
+        status="OPEN",
+        reported_at=datetime.utcnow()
+    )
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    log_audit(db, payload.reported_by, "PHC_ADMIN", "REPORT_INCIDENT", "FACILITY_INCIDENT", str(incident.id), f"Reported operational bottleneck: {payload.title}")
+    return incident
+
+@app.patch("/api/incidents/{incident_id}/status", response_model=schemas.FacilityIncidentOut)
+def update_facility_incident_status(incident_id: int, status: str, db: Session = Depends(get_db)):
+    incident = db.query(models.FacilityIncident).filter(models.FacilityIncident.id == incident_id).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    incident.status = status
+    if status == "RESOLVED":
+        incident.resolved_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(incident)
+    log_audit(db, "Administrator", "PHC_ADMIN", "UPDATE_INCIDENT_STATUS", "FACILITY_INCIDENT", str(incident_id), f"Updated incident status to {status}")
+    return incident
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=10000)
+
 

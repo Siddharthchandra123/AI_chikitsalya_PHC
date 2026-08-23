@@ -109,5 +109,20 @@ export const api = {
 
   // Audit Logs
   getAuditLogs: () => 
-    fetchJson<any[]>(`${API_BASE}/audit-logs`)
+    fetchJson<any[]>(`${API_BASE}/audit-logs`),
+
+  // Facility Incidents & Operational Bottlenecks
+  getIncidents: (facilityId?: number, status?: string) => {
+    const params = new URLSearchParams();
+    if (facilityId) params.append("facility_id", facilityId.toString());
+    if (status) params.append("status", status);
+    return fetchJson<any[]>(`${API_BASE}/incidents?${params.toString()}`);
+  },
+
+  createIncident: (data: Record<string, any>) => 
+    fetchJson<any>(`${API_BASE}/incidents`, { method: "POST", body: JSON.stringify(data) }),
+
+  updateIncidentStatus: (id: number, status: string) => 
+    fetchJson<any>(`${API_BASE}/incidents/${id}/status?status=${status}`, { method: "PATCH" })
 };
+

@@ -136,3 +136,27 @@ class PrescriptionCreate(BaseModel):
     diagnosis: str
     medicines: List[dict]
     notes: Optional[str] = None
+
+class FacilityIncidentCreate(BaseModel):
+    facility_id: int
+    category: str
+    title: str
+    description: Optional[str] = None
+    severity: Optional[str] = "MEDIUM"
+    reported_by: str
+
+class FacilityIncidentOut(BaseModel):
+    id: int
+    facility_id: int
+    category: str
+    title: str
+    description: Optional[str] = None
+    severity: str
+    status: str
+    reported_by: str
+    reported_at: datetime
+    resolved_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+

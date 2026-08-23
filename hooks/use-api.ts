@@ -214,6 +214,26 @@ export function useFollowUps(status?: string): HookResult<FollowUp[]> {
   return { data, loading, error, refetch };
 }
 
+export function useIncidents(facilityId?: number, status?: string): HookResult<any[]> {
+  const [data, setData] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState<number>(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    api.getIncidents(facilityId, status)
+      .then((res) => { if (active) { setData(res); setLoading(false); } })
+      .catch((err) => { if (active) { setError(err.message || "Failed to fetch incidents"); setLoading(false); } });
+    return () => { active = false; };
+  }, [facilityId, status, tick]);
+
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
+  return { data, loading, error, refetch };
+}
+
+
 // Helpers for pre-existing legacy UI compatibility
 export function usePrescriptions(patientId?: string): HookResult<any[]> {
   return { data: [], loading: false, error: null, refetch: () => {} };

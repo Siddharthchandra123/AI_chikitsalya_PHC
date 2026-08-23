@@ -23,7 +23,12 @@ import {
   ShieldAlert, 
   UserCheck, 
   Filter,
-  FileText
+  FileText,
+  Plus,
+  Wrench,
+  Truck,
+  Zap,
+  AlertCircle
 } from "lucide-react"
 
 import { 
@@ -32,12 +37,14 @@ import {
   useReferrals, 
   usePharmacyInventory, 
   useDoctors, 
-  useFollowUps 
+  useFollowUps,
+  useIncidents
 } from "@/hooks/use-api"
+import { api } from "@/lib/api/client"
 import { useRBAC } from "@/lib/rbac-context"
 
 export default function CommandCenterPage() {
-  const { role, facilityName } = useRBAC()
+  const { role, userName, facilityName } = useRBAC()
   const [selectedFacilityId, setSelectedFacilityId] = useState<number>(3)
 
   const { data: overview, loading: overviewLoading, refetch: refetchOverview } = useCommandOverview(selectedFacilityId)
@@ -45,11 +52,49 @@ export default function CommandCenterPage() {
   const { data: referrals, loading: referralsLoading } = useReferrals()
   const { data: inventory, loading: inventoryLoading } = usePharmacyInventory(selectedFacilityId)
   const { data: doctors, loading: doctorsLoading } = useDoctors(selectedFacilityId)
-  const { data: followUps, loading: followUpsLoading } = useFollowUps()
+  const { data: incidents, loading: incidentsLoading, refetch: refetchIncidents } = useIncidents(selectedFacilityId)
+
+  // New Incident Form Modal state
+  const [showNewIncident, setShowNewIncident] = useState(false)
+  const [newIncident, setNewIncident] = useState({
+    category: "MEDICINE_SHORTAGE",
+    title: "",
+    description: "",
+    severity: "HIGH"
+  })
 
   const handleRefreshAll = () => {
     refetchOverview()
     refetchQueue()
+    refetchIncidents()
+  }
+
+  const handleReportIncident = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await api.createIncident({
+        facility_id: selectedFacilityId,
+        category: newIncident.category,
+        title: newIncident.title,
+        description: newIncident.description,
+        severity: newIncident.severity,
+        reported_by: userName || "PHC Medical Officer"
+      })
+      setShowNewIncident(false)
+      setNewIncident({ category: "MEDICINE_SHORTAGE", title: "", description: "", severity: "HIGH" })
+      refetchIncidents()
+    } catch (err: any) {
+      alert(`Error creating incident: ${err.message}`)
+    }
+  }
+
+  const handleUpdateIncidentStatus = async (id: number, status: string) => {
+    try {
+      await api.updateIncidentStatus(id, status)
+      refetchIncidents()
+    } catch (err: any) {
+      alert(`Error updating incident: ${err.message}`)
+    }
   }
 
   const lowStockItems = inventory?.filter((i) => i.status !== "AVAILABLE") || []
@@ -65,14 +110,14 @@ export default function CommandCenterPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Badge variant="outline" className="gap-1.5 py-1 px-3 bg-blue-500/10 text-blue-600 border-blue-500/20 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                  PHC / Hospital Command Center
+                <Badge variant="outline" className="gap-1.5 py-1 px-3 bg-red-500/10 text-red-600 border-red-500/20 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                  PHC & Rural Hospital Operations Center
                 </Badge>
                 <Badge variant="secondary" className="text-xs">Role: {role}</Badge>
               </div>
               <h1 className="text-3xl font-bold tracking-tight">{overview?.facility_name || facilityName}</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Real-time facility operations, patient queue, telemetry & emergency logistics</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Facility bottleneck tracking, emergency transfers, doctor shifts & supply chain monitoring</p>
             </div>
 
             <div className="flex items-center gap-3">
@@ -96,7 +141,7 @@ export default function CommandCenterPage() {
             </div>
           </div>
 
-          {/* Overview Metrics Cards (Dynamic backend data) */}
+          {/* Overview Metrics Cards */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <Card className="p-5 rounded-2xl bg-card border shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -106,7 +151,7 @@ export default function CommandCenterPage() {
                 <Badge variant="outline" className="text-xs font-semibold text-blue-600">Today</Badge>
               </div>
               <p className="text-2xl font-extrabold">{overviewLoading ? "..." : overview?.patients_today || 0}</p>
-              <p className="text-xs text-muted-foreground font-medium mt-1">Total Patient Registrations</p>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Total Patient Footfall</p>
             </Card>
 
             <Card className="p-5 rounded-2xl bg-card border shadow-sm">
@@ -125,7 +170,7 @@ export default function CommandCenterPage() {
                 <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
                   <Clock className="w-5 h-5" />
                 </div>
-                <Badge variant="outline" className="text-xs font-semibold text-amber-600">Live Queue</Badge>
+                <Badge variant="outline" className="text-xs font-semibold text-amber-600">Queue congestion</Badge>
               </div>
               <p className="text-2xl font-extrabold">{overviewLoading ? "..." : `${overview?.average_wait_mins || 0} mins`}</p>
               <p className="text-xs text-muted-foreground font-medium mt-1">Average Wait Time ({overview?.waiting_patients || 0} waiting)</p>
@@ -136,12 +181,143 @@ export default function CommandCenterPage() {
                 <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-600">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
-                <Badge variant="destructive" className="text-xs font-semibold">Urgent</Badge>
+                <Badge variant="destructive" className="text-xs font-semibold">Critical</Badge>
               </div>
               <p className="text-2xl font-extrabold">{overviewLoading ? "..." : overview?.emergency_cases || 0}</p>
               <p className="text-xs text-muted-foreground font-medium mt-1">Emergency Escalation Cases</p>
             </Card>
           </div>
+
+          {/* HOSPITAL & PHC OPERATIONAL BOTTLENECK TRACKER (FACILITY-CENTRIC) */}
+          <Card className="p-6 rounded-3xl border border-red-500/30 bg-card shadow-sm mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-red-600" />
+                  <h2 className="text-lg font-bold">PHC Operational Problem & Bottleneck Incident Hub</h2>
+                  <Badge variant="destructive" className="text-[10px]">
+                    {incidents?.filter(i => i.status !== "RESOLVED").length || 0} Active Bottlenecks
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Track and resolve facility operational problems: antivenom/drug stock-outs, equipment failure, shift gaps, and waterlogged ambulance routes.
+                </p>
+              </div>
+
+              <Button onClick={() => setShowNewIncident(!showNewIncident)} className="gap-2 rounded-xl text-xs bg-red-600 hover:bg-red-700">
+                <Plus className="w-4 h-4" />
+                Report Facility Bottleneck
+              </Button>
+            </div>
+
+            {/* New Incident Form Modal */}
+            {showNewIncident && (
+              <form onSubmit={handleReportIncident} className="p-4 rounded-2xl border bg-secondary/30 mb-6 text-xs space-y-3">
+                <h3 className="font-bold text-sm text-foreground">Report New Facility Operational Problem</h3>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-semibold text-muted-foreground block mb-1">Problem Category</label>
+                    <select 
+                      value={newIncident.category}
+                      onChange={(e) => setNewIncident({...newIncident, category: e.target.value})}
+                      className="w-full p-2.5 rounded-xl border bg-background text-xs outline-none"
+                    >
+                      <option value="MEDICINE_SHORTAGE">Medicine / Supply Shortage</option>
+                      <option value="AMBULANCE_DELAY">Ambulance Route Delay</option>
+                      <option value="EQUIPMENT_FAILURE">Equipment / Lab Downtime</option>
+                      <option value="STAFF_ABSENTEEISM">Staffing / Doctor Shift Gap</option>
+                      <option value="BED_SURGE">Bed / ICU Capacity Surge</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground block mb-1">Problem Severity</label>
+                    <select 
+                      value={newIncident.severity}
+                      onChange={(e) => setNewIncident({...newIncident, severity: e.target.value})}
+                      className="w-full p-2.5 rounded-xl border bg-background text-xs outline-none"
+                    >
+                      <option value="CRITICAL">CRITICAL</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="LOW">LOW</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground block mb-1">Title</label>
+                    <input 
+                      required
+                      type="text"
+                      value={newIncident.title}
+                      onChange={(e) => setNewIncident({...newIncident, title: e.target.value})}
+                      placeholder="e.g. Anti-Snake Venom Vials Low"
+                      className="w-full p-2.5 rounded-xl border bg-background text-xs outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="font-semibold text-muted-foreground block mb-1">Description & Immediate Mitigation</label>
+                  <textarea 
+                    value={newIncident.description}
+                    onChange={(e) => setNewIncident({...newIncident, description: e.target.value})}
+                    placeholder="Details about the operational impact..."
+                    className="w-full p-2.5 rounded-xl border bg-background text-xs outline-none h-16"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button type="button" variant="outline" onClick={() => setShowNewIncident(false)} className="rounded-xl text-xs">
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="rounded-xl text-xs bg-red-600 hover:bg-red-700">
+                    Log Bottleneck Incident
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* Incident Cards Stream */}
+            {incidentsLoading ? (
+              <div className="py-6 text-center text-xs text-muted-foreground">Loading facility bottlenecks...</div>
+            ) : !incidents || incidents.length === 0 ? (
+              <div className="py-6 text-center text-xs text-emerald-600 font-medium">All facility operational systems functioning normally</div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {incidents.map((inc) => (
+                  <div key={inc.id} className="p-4 rounded-2xl border bg-secondary/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={inc.severity === "CRITICAL" ? "destructive" : inc.severity === "HIGH" ? "default" : "outline"} className="text-[10px]">
+                          {inc.severity}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px]">{inc.category}</Badge>
+                      </div>
+                      <Badge variant={inc.status === "RESOLVED" ? "outline" : "secondary"} className={`text-[10px] ${inc.status === "RESOLVED" ? "text-emerald-600 border-emerald-500/20" : "text-amber-600"}`}>
+                        {inc.status}
+                      </Badge>
+                    </div>
+
+                    <h4 className="font-bold text-xs text-foreground mt-1">{inc.title}</h4>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">{inc.description}</p>
+                    
+                    <div className="pt-2 border-t flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span>Reported by: {inc.reported_by}</span>
+                      <div className="flex items-center gap-2">
+                        {inc.status === "OPEN" && (
+                          <Button size="sm" onClick={() => handleUpdateIncidentStatus(inc.id, "IN_PROGRESS")} className="h-6 px-2 text-[10px] rounded-lg">
+                            Mark In Progress
+                          </Button>
+                        )}
+                        {inc.status !== "RESOLVED" && (
+                          <Button size="sm" onClick={() => handleUpdateIncidentStatus(inc.id, "RESOLVED")} className="h-6 px-2 text-[10px] rounded-lg bg-emerald-600 hover:bg-emerald-700">
+                            Mark Resolved
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
 
           {/* Main Command Grid */}
           <div className="grid lg:grid-cols-3 gap-6 mb-8">

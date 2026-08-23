@@ -245,6 +245,47 @@ def seed_database():
     db.add_all([a1])
     db.commit()
 
+    # 9. Operational Incidents & Facility Bottlenecks
+    inc1 = models.FacilityIncident(
+        facility_id=3,
+        category="MEDICINE_SHORTAGE",
+        title="Anti-Snake Venom (ASV) Vials Below Safety Threshold",
+        description="PHC Shahpur inventory has only 2 vials of ASV remaining. Emergency requisition sent to District Hospital Rampur.",
+        severity="CRITICAL",
+        status="OPEN",
+        reported_by="PHC Pharmacist Verma"
+    )
+    inc2 = models.FacilityIncident(
+        facility_id=3,
+        category="AMBULANCE_DELAY",
+        title="Emergency Ambulance Transfer Delay (Khedi Sub-centre Route)",
+        description="Heavy monsoon waterlogging causing 25-minute delay on Khedi to PHC Shahpur emergency transfer corridor.",
+        severity="HIGH",
+        status="IN_PROGRESS",
+        reported_by="ASHA Coordinator Sunita"
+    )
+    inc3 = models.FacilityIncident(
+        facility_id=2,
+        category="EQUIPMENT_FAILURE",
+        title="Digital X-Ray Sensor Calibration Error",
+        description="Block Hospital Bilaspur radiology lab reporting sensor error code E-104. Technician dispatched from District HQ.",
+        severity="MEDIUM",
+        status="IN_PROGRESS",
+        reported_by="Dr. Priya Singh"
+    )
+    inc4 = models.FacilityIncident(
+        facility_id=1,
+        category="BED_SURGE",
+        title="ICU Oxygen Bed Occupancy at 90%",
+        description="District Hospital Rampur ICU unit experiencing high referral volume from Bilaspur and Shahpur blocks.",
+        severity="HIGH",
+        status="OPEN",
+        reported_by="Hospital Administrator Gupta"
+    )
+
+    db.add_all([inc1, inc2, inc3, inc4])
+    db.commit()
+
     print("[SUCCESS] Database seeding complete!")
     db.close()
 

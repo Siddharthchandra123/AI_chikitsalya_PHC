@@ -216,10 +216,24 @@ class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_name = Column(String, default="System")
-    role = Column(String, default="HEALTH_WORKER")
+    user_name = Column(String, nullable=False)
+    role = Column(String, nullable=False)
     action = Column(String, nullable=False)
     entity_type = Column(String, nullable=False)
     entity_id = Column(String, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     details = Column(Text, nullable=True)
+
+class FacilityIncident(Base):
+    __tablename__ = "facility_incidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=False)
+    category = Column(String, nullable=False) # MEDICINE_SHORTAGE, STAFF_ABSENTEEISM, EQUIPMENT_FAILURE, BED_SURGE, AMBULANCE_DELAY
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    severity = Column(String, default="MEDIUM") # CRITICAL, HIGH, MEDIUM, LOW
+    status = Column(String, default="OPEN") # OPEN, IN_PROGRESS, RESOLVED
+    reported_by = Column(String, nullable=False)
+    reported_at = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
